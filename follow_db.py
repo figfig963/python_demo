@@ -133,7 +133,7 @@ elif page == "商品データ記録":
             now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             cur.execute(
                 "INSERT INTO posts (filename, likes, shop, memo, created_date) VALUES (?, ?, ?, ?, ?)",
-                (uploaded_image.name, likes_input, shop_name_input, memo_text, now)
+                (uploaded_image.name, int(likes_input), shop_name_input, memo_text, now)
             )
             con.commit()
             st.success("画像情報をデータベースに登録しました！")

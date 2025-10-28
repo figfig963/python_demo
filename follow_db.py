@@ -34,16 +34,21 @@ con.commit()
 
 # サイドバー
 st.sidebar.title("メニュー")
-page = st.sidebar.radio("ページを選択", ["ホーム", "フォロ活：目標設定", "フォロ活：データ記録", "商品データ記録", "CSVアップロード", "グラフ表示"])
+page = st.sidebar.radio("ページを選択", ["ホーム", "フォロ活：目標設定", "フォロ活：データ記録", "商品データ記録", "CSVアップロード", "分析ダッシュボード"])
 
 # ホーム
 if page == "ホーム":
-    st.title("楽天ROOM フォロワー推移記録アプリ")
+    st.title("楽天ROOM 活動記録アプリ")
     st.markdown("""
-        このアプリでは、楽天ROOMのフォロー数・フォロワー数を記録し、
-        時系列でグラフ表示・CSVの保存ができます。
-        左のメニューから操作してください。
-    """)
+        **各ページの説明**
+
+        - フォロ活：目標設定    … 今月の目標フォロー数・フォロワー数を設定（更新可）  
+        - フォロ活：データ記録  … フォロー数・フォロワー数を日付単位で記録  
+        - 商品データ記録       … 商品ごとのいいね数などの記録  
+        - CSVアップロード      … shop_csvのアップロード  
+        - 分析ダッシュボード   …フォロー活動の進捗、ショップごとの反応率を表示  
+        """)
+
 
 # 目標設定
 elif page == "フォロ活：目標設定":
@@ -87,25 +92,22 @@ elif page == "フォロ活：データ記録":
             con.commit()
             st.success(f"id = {selected_id} のデータを削除しました！")
 
-# データ記録2（OCR）
+
+# 商品データ記録ページ
 elif page == "商品データ記録":
     st.title("楽天ROOM 分析データ更新")
 
     # --- ① 画像アップロード＆OCR処理 ---
     st.subheader("🖼️ 商品画像から情報抽出")
     uploaded_image = st.file_uploader("商品画像をアップロード", type=["png", "jpg", "jpeg"])
-    
 
     if uploaded_image:
         image = Image.open(uploaded_image)
-        st.image(image, caption="アップロードされた画像", use_container_width=True)
+        st.image(image, caption="アップロードされた画像", use_column_width=True)
 
         reader = easyocr.Reader(['ja'], gpu=False)
         result = reader.readtext(np.array(image), detail=0)
         text = "\n".join(result)
-
-        # st.markdown("#### 抽出されたテキスト")
-        # st.code(text)
 
         match1 = re.search(r'(\d+)\s*口', text)
         match2 = re.search(r'価\s*(.+)', text)
@@ -138,6 +140,39 @@ elif page == "商品データ記録":
             con.commit()
             st.success("画像情報をデータベースに登録しました！")
 
+    # --- ② 登録済みデータの表示・編集・削除 ---
+    st.markdown("---")
+    st.subheader("📋 登録済み商品データ（最新30件）")
+
+    df_posts = pd.read_sql_query("SELECT * FROM posts ORDER BY created_date DESC LIMIT 30", con)
+
+    if df_posts.empty:
+        st.info("まだデータが登録されていません。")
+    else:
+        st.dataframe(df_posts)
+
+        # 削除対象の選択
+        st.subheader("🗑️ データ削除")
+        delete_options = df_posts.apply(
+                lambda row: f"{row['filename']} | {row['likes']} | {row['created_date']}", axis=1
+        )
+        selected_delete = st.selectbox("削除するデータを選択", delete_options, key="delete_select")
+
+        if st.button("選択したデータを削除") and selected_delete:
+            delete_index = delete_options[delete_options == selected_delete].index[0]
+            delete_row = df_posts.loc[delete_index]
+            
+            filename = str(delete_row["filename"])
+            likes = int(delete_row["likes"])
+            created_date = str(delete_row["created_date"])
+
+            cur.execute(
+                "DELETE FROM posts WHERE filename = ? AND likes = ? AND created_date = ?",
+                (filename, likes, created_date)
+                )
+            con.commit()
+            st.success("データを削除しました！ページを再読み込みしてください。")
+
 elif page == "CSVアップロード":
     st.subheader("📄 shop.csvをアップロードして登録")
     uploaded_csv = st.file_uploader("shop.csv をアップロード", type=["csv"], key="csv_uploader")
@@ -159,9 +194,9 @@ elif page == "CSVアップロード":
             con.commit()
             st.success("CSVデータをshop_csvテーブルに保存しました！")
 
-# グラフ表示
-elif page == "グラフ表示":
-    st.title("📈 フォロ活の進捗")
+# ダッシュボード表示
+elif page == "分析ダッシュボード":
+    st.title("📈 フォロ活：分析")
     latest = pd.read_sql_query("SELECT * FROM follow_stats ORDER BY date DESC LIMIT 1", con)
     latest_date = pd.to_datetime(latest["date"][0])
     latest_month = latest_date.strftime("%Y-%m")
@@ -191,8 +226,8 @@ elif page == "グラフ表示":
 
     if not df.empty:
         fig = go.Figure()
-        fig.add_trace(go.Scatter(x=df["date_str"], y=df["follow_diff"], mode='lines+markers', name='フォロー数'))
-        fig.add_trace(go.Scatter(x=df["date_str"], y=df["follower_diff"], mode='lines+markers', name='フォロワー数'))
+        fig.add_trace(go.Scatter(x=df["date_str"], y=df["follow_diff"], mode='lines+markers', name='フォロー増加数'))
+        fig.add_trace(go.Scatter(x=df["date_str"], y=df["follower_diff"], mode='lines+markers', name='フォロワー増加数'))
         fig.update_layout(xaxis=dict(type="category"))
         st.plotly_chart(fig)
 
@@ -202,7 +237,7 @@ elif page == "グラフ表示":
             st.warning("画像保存には kaleido パッケージが必要です。`pip install -U kaleido` を実行してください。")
 
         #反応率ランキング
-        st.title("📊 反応率ランキング TOP10")
+        st.title("📊 商品分析")
         query = """
                 SELECT
                 a.shop_name,

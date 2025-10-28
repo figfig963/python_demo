@@ -2,5 +2,5 @@ streamlit
 pandas
 plotly
 pillow
-pytesseract
+easyocr
 kaleido

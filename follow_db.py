@@ -231,10 +231,10 @@ elif page == "分析ダッシュボード":
         fig.update_layout(xaxis=dict(type="category"))
         st.plotly_chart(fig)
 
-        try:
-            fig.write_image("follow_chart.png")
-        except Exception:
-            st.warning("画像保存には kaleido パッケージが必要です。`pip install -U kaleido` を実行してください。")
+        # try:
+        #     fig.write_image("follow_chart.png")
+        # except Exception:
+        #     st.warning("画像保存には kaleido パッケージが必要です。`pip install -U kaleido` を実行してください。")
 
         #反応率ランキング
         st.title("📊 商品分析")

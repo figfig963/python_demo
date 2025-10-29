@@ -103,7 +103,7 @@ elif page == "商品データ記録":
 
     if uploaded_image:
         image = Image.open(uploaded_image)
-        st.image(image, caption="アップロードされた画像", use_column_width=True)
+        st.image(image, caption="アップロードされた画像", use_container_width=True)
 
         reader = easyocr.Reader(['ja'], gpu=False)
         result = reader.readtext(np.array(image), detail=0)
